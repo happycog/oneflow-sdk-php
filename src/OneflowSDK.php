@@ -241,6 +241,8 @@ class OneflowSDK {
 		$urlParts = parse_url($url);
 		$fullPath = $urlParts['path'];
 
+        $headers = $this->generate_headers($method, $path);
+
 		if (filter_var($url, FILTER_VALIDATE_URL)===FALSE)	return false;
 
 		$params = array(
@@ -252,7 +254,6 @@ class OneflowSDK {
 				'ciphers' => 'ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:DH-DSS-AES256-GCM-SHA384:DHE-DSS-AES256-GCM-SHA384:DH-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA256:DH-RSA-AES256-SHA256:DH-DSS-AES256-SHA256:ECDH-RSA-AES256-GCM-SHA384:ECDH-ECDSA-AES256-GCM-SHA384:ECDH-RSA-AES256-SHA384:ECDH-ECDSA-AES256-SHA384:AES256-GCM-SHA384:AES256-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:DH-DSS-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:DH-RSA-AES128-GCM-SHA256:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES128-SHA256:DHE-DSS-AES128-SHA256:DH-RSA-AES128-SHA256:DH-DSS-AES128-SHA256:ECDH-RSA-AES128-GCM-SHA256:ECDH-ECDSA-AES128-GCM-SHA256:ECDH-RSA-AES128-SHA256:ECDH-ECDSA-AES128-SHA256:AES128-GCM-SHA256:AES128-SHA256'
 			)
 		);
-
 		if ($method=="POST" || $method=="PUT")	{
 			$params['http']['content'] = $jsonData;
 		}
@@ -260,10 +261,16 @@ class OneflowSDK {
 		$params['http']['header'][] = "x-oneflow-date: $timestamp";
 		$params['http']['header'][] = $this->authHeader.": ".$this->token($method, $fullPath, $timestamp);
 
+        foreach($headers as $header){
+            $params['http']['header'][] = $header;
+        }
+
 		foreach ($optional_headers as $name => $value)	{
 			$params['http']['header'][] = "$name: $value";
 		}
-
+        echo "<pre>";
+        var_dump($params['http']['header']);
+        var_dump($url);
 		$context = stream_context_create($params);
 		$fp = fopen($url, 'rb', false, $context);
 		if (!$fp)	{
@@ -306,6 +313,7 @@ class OneflowSDK {
 	 * @return mixed
 	 */
 	public function post($path, $jsonData, $format = 'application/json')	{
+
 		try {
 			$response = $this->request("POST", $path, $jsonData, array(
 	    		'Content-Type' => $format,
@@ -360,6 +368,26 @@ class OneflowSDK {
 
 		return $response;
 	}
+    private function generate_headers($method, $path) {
+        $t = microtime(true);
+        $micro = sprintf("%03d",($t - floor($t)) * 1000);
+        $timestamp = gmdate('Y-m-d\TH:i:s.', $t).$micro.'Z';
+
+        // Create the HMAC header to authenticate the API calls.
+
+        $str = $method . ' ' . $path . ' ' .$timestamp;
+        $hash = hash_hmac('sha1', $str, $this->secret);
+        $hmacHeader = $this->key . ':' . $hash;
+
+        $headers = [
+            'x-hp-hmac-authentication: ' . $hmacHeader,
+            'x-hp-hmac-date: ' . $timestamp,
+            'x-hp-hmac-algorithm: SHA1'
+        ];
+        return $headers;
+        // return [];
+
+    }
 
 	/**
 	 * post_file function.
