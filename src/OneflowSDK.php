@@ -268,9 +268,6 @@ class OneflowSDK {
 		foreach ($optional_headers as $name => $value)	{
 			$params['http']['header'][] = "$name: $value";
 		}
-        echo "<pre>";
-        var_dump($params['http']['header']);
-        var_dump($url);
 		$context = stream_context_create($params);
 		$fp = fopen($url, 'rb', false, $context);
 		if (!$fp)	{
